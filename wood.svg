@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Holzfarb-Verlauf -->
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8a5a2b"></stop>
+      <stop offset="50%" stop-color="#a56b38"></stop>
+      <stop offset="100%" stop-color="#6f4521"></stop>
+    </linearGradient>
+
+    <!-- Holzmaserung per Perlin Noise -->
+    <filter id="wood" x="0" y="0" width="1" height="1">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.18" numOctaves="4" seed="7" stitchTiles="stitch" result="noise"></feTurbulence>
+      <feColorMatrix type="saturate" values="0.6" in="noise" result="sat"></feColorMatrix>
+      <feComponentTransfer in="sat" result="grain">
+        <feFuncR type="gamma" amplitude="1" exponent="0.9" offset="0"></feFuncR>
+        <feFuncG type="gamma" amplitude="1" exponent="1.0" offset="0"></feFuncG>
+        <feFuncB type="gamma" amplitude="1" exponent="1.1" offset="0"></feFuncB>
+      </feComponentTransfer>
+      <!-- Helligkeit/Schattierung für Ringe -->
+      <feDiffuseLighting in="grain" surfaceScale="1.2" lighting-color="#7d4d25" result="lit">
+        <feDistantLight azimuth="225" elevation="35"></feDistantLight>
+      </feDiffuseLighting>
+      <feComposite in="lit" in2="grain" operator="arithmetic" k1="0" k2="1.0" k3="0.35" k4="0" result="woody"></feComposite>
+    </filter>
+
+    <!-- Nahtloses Kachelmuster -->
+    <pattern id="tile" width="256" height="256" patternUnits="userSpaceOnUse">
+      <rect width="256" height="256" fill="url(#g)"></rect>
+      <rect width="256" height="256" filter="url(#wood)" opacity="0.65"></rect>
+      <!-- feine Bretterfuge -->
+      <rect y="255" width="256" height="1" fill="#5a3719" opacity="0.5"></rect>
+    </pattern>
+  </defs>
+
+  <!-- Fläche mit Holz-Muster -->
+  <rect width="1024" height="1024" fill="url(#tile)"></rect>
+</svg>
