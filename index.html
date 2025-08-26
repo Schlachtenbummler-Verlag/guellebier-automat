@@ -4,53 +4,121 @@
 <meta charset="UTF-8">
 <title>Saxonischer Güllebier-Rezepte-Automatron</title>
 <style>
-  body{background:#000;margin:0;padding:0;font-family:sans-serif}
-  .gba{color:#fff;background:#222;padding:18px;border-radius:12px;max-width:680px;margin:40px auto}
-  .gba__header{text-align:center}
-  .gba__machine{margin:12px 0;text-align:center}
-  .gba__reels{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
-  .reel{background:#111;padding:10px;border-radius:8px;display:flex;align-items:center;justify-content:center}
-  .symbol{width:90px;height:90px;display:flex;align-items:center;justify-content:center;overflow:hidden}
-  .symbol img{width:100%;height:100%;object-fit:contain;display:block}
-  .symbol svg{width:100%;height:100%;display:block}
-  .gba__lever{background:#f8d24a;border:none;padding:8px 16px;font-weight:bold;border-radius:20px;cursor:pointer}
-  .gba__result{margin-top:12px;padding:8px;background:#111;border-radius:8px;min-height:50px}
-  .badge{
-    display:inline-block;margin-left:6px;padding:2px 6px;border-radius:8px;
-    font-size:.8rem;background:#FFD700;color:#000;font-weight:bold /* Goldener Thaler */
+  /* Scrollbar & Layout stabil halten (kein Seiten-Bump) */
+  html{ scrollbar-gutter: stable both-edges; }
+  body{ 
+    background:#000; margin:0; padding:0; font-family:sans-serif; color:#fff; 
+    overflow-y:scroll; text-align:center; /* sorgt dafür, dass frame-wood mittig sitzt */
   }
-  .desc{font-size:.85rem;color:#ccc;margin-top:4px}
-  .back-btn{margin:30px auto;text-align:center}
-  .back-btn button{background:#444;color:#fff;padding:10px 20px;border:none;border-radius:8px;cursor:pointer}
+
+  /* Holzrahmen-Wrapper */
+  .frame-wood{
+    --frame: clamp(22px, 3.2vw, 44px);
+    display: inline-block;        /* nur so breit wie der Inhalt */
+    margin: 40px auto;            /* zentriert */
+    padding: var(--frame);
+    border: var(--frame) solid transparent;
+    border-image-source: url('assets/img/wood.svg');
+    border-image-slice: 140;
+    border-image-width: var(--frame);
+    border-image-repeat: round;
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.35);
+    position:relative;
+  }
+  .frame-wood::before{
+    content:"";
+    position:absolute; inset: calc(var(--frame) - 1px);
+    border-radius: 12px;
+    box-shadow: inset 0 6px 14px rgba(0,0,0,.35), inset 0 -4px 8px rgba(0,0,0,.25);
+    pointer-events:none;
+  }
+  @media (max-width: 420px){
+    .frame-wood{ --frame: 18px; }
+  }
+
+  /* Automat (breitenstabil & responsive) */
+  .gba{
+    color:#fff; background:#222; padding:18px; border-radius:12px;
+    width: min(680px, 92vw); max-width:680px; /* stabilisiert die Breite */
+  }
+  .gba__header{text-align:center}
+
+  /* Maschine: verteilt Reels (oben), Button (mitte), Ergebnis (unten) */
+  .gba__machine{
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between; /* vertikale Verteilung */
+    align-items:center;
+    margin:12px 0;
+    text-align:center;
+    min-height:360px; /* sorgt für genug Platz */
+  }
+
+  .gba__reels{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:0}
+  .reel{background:#111; padding:10px; border-radius:8px; display:flex; align-items:center; justify-content:center}
+  .symbol{width:90px; height:90px; display:flex; align-items:center; justify-content:center; overflow:hidden}
+  .symbol img{width:100%; height:100%; object-fit:contain; display:block}
+  .symbol svg{width:100%; height:100%; display:block}
+
+  .gba__action{text-align:center; margin: 8px 0;}
+  .gba__lever{background:#f8d24a; border:none; padding:8px 16px; font-weight:bold; border-radius:20px; cursor:pointer}
+
+  /* Ergebnis: untereinander */
+  .gba__result{
+    margin-top:0;
+    width:100%;
+    display:flex; flex-direction:column;
+    justify-content:center; align-items:flex-start;
+    text-align:left; gap:6px;
+    padding:8px; background:#111; border-radius:8px; min-height:96px;
+  }
+  .gba__result .name{ font-weight:700; margin:0; }
+  .gba__result .desc{ margin:0; color:#ccc; }
+  .gba__result .reward{ margin:0; }
+
+  .badge{
+    display:inline-block; margin-right:6px; padding:2px 6px; border-radius:8px;
+    font-size:.8rem; background:#FFD700; color:#000; font-weight:bold; /* Goldener Thaler */
+  }
+
+  .back-btn{margin:30px auto; text-align:center}
+  .back-btn button{background:#444; color:#fff; padding:10px 20px; border:none; border-radius:8px; cursor:pointer}
   .back-btn button:hover{background:#666}
 
   /* Overlay: Bitte ins Querformat drehen (für Handy im Hochformat) */
   #rotateOverlay{
-    position:fixed;inset:0;display:none;z-index:9999;
-    background:rgba(0,0,0,.9);color:#FFD700;
-    font-size:1.4rem;line-height:1.4;text-align:center;
-    align-items:center;justify-content:center
+    position:fixed; inset:0; display:none; z-index:9999;
+    background:rgba(0,0,0,.9); color:#FFD700;
+    font-size:1.4rem; line-height:1.4; text-align:center;
+    align-items:center; justify-content:center;
   }
 </style>
 </head>
 <body>
-<div id="guellebier-automat" class="gba">
-  <div class="gba__header">
-    <h2>Saxonischer® Rezepte-Automatron 2000</h2>
-    <p class="gba__sub">Welche Rüben müssen für das Güllebier-Rezept geerntet werden?</p>
-  </div>
 
-  <div class="gba__machine">
-    <div class="gba__reels">
-      <div class="reel" data-index="0"><div class="symbol"></div></div>
-      <div class="reel" data-index="1"><div class="symbol"></div></div>
-      <div class="reel" data-index="2"><div class="symbol"></div></div>
-      <div class="reel" data-index="3"><div class="symbol"></div></div>
+<div class="frame-wood">
+  <div id="guellebier-automat" class="gba">
+    <div class="gba__header">
+      <h2>Saxonischer® Rezepte-Automatron 2000</h2>
+      <p class="gba__sub">Welche Rüben müssen für das Güllebier-Rezept geerntet werden?</p>
     </div>
-    <button class="gba__lever" id="gbaSpin" type="button">Knopf drücken</button>
-  </div>
 
-  <div class="gba__result" id="gbaResult"></div>
+    <div class="gba__machine">
+      <div class="gba__reels">
+        <div class="reel" data-index="0"><div class="symbol"></div></div>
+        <div class="reel" data-index="1"><div class="symbol"></div></div>
+        <div class="reel" data-index="2"><div class="symbol"></div></div>
+        <div class="reel" data-index="3"><div class="symbol"></div></div>
+      </div>
+
+      <div class="gba__action">
+        <button class="gba__lever" id="gbaSpin" type="button">Knopf drücken</button>
+      </div>
+
+      <div class="gba__result" id="gbaResult"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Zurück-Button -->
@@ -82,19 +150,15 @@ function handleBack(){
 // Overlay-Logik (Handy: Querformat empfohlen)
 function checkOrientation(){
   const ov = document.getElementById('rotateOverlay');
-  if (!ov) return; // falls Element noch nicht vorhanden
+  if (!ov) return;
   ov.style.display = (window.innerHeight > window.innerWidth) ? 'flex' : 'none';
 }
 
-// Nach DOM-Ladung initialisieren
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded',()=>{
   checkOrientation();
   window.addEventListener('resize', checkOrientation);
   window.addEventListener('orientationchange', checkOrientation);
-});
 
-document.addEventListener('DOMContentLoaded',()=>{
-  // DOM-Refs
   const reels = Array.from(document.querySelectorAll('.reel'));
   const btn   = document.querySelector('#gbaSpin');
   const out   = document.querySelector('#gbaResult');
@@ -103,7 +167,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   const sndStop=document.getElementById('sndStop');
   const sndResult=document.getElementById('sndResult');
 
-  // Farben & Assets
   const COLORS = ['rot','blau','gruen','gelb'];
   const IMG = {
     rot:'assets/img/rot.png',
@@ -118,7 +181,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     gelb:`<svg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'><path fill='#79b92f' d='M42 10c6 1 10 6 10 12-6-2-11-6-10-12zM37 9c-2 5-8 10-15 10 3-7 9-11 15-10z'/><path fill='#f5d142' d='M31 18c10 0 19 8 19 18S43 54 31 54 12 45 12 36s9-18 19-18z'/></svg>`
   };
 
-  // Rezepte (35) – Punkte als Ganzzahlen (Thaler)
   const RECIPES = {
     'rot,rot,rot,rot': {name:'Dösselheimer Güllebier',pts:15,desc:'Die braune Seele Saxoniens.'},
     'blau,blau,blau,blau': {name:'Leberknebel - Export',pts:15,desc:'Seitenstechen auch ohne Meuchelmörder.'},
@@ -163,67 +225,66 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 
   function normalize(combo){ return combo.slice().sort().join(','); }
+
   function evaluate(result){
-  const key = normalize(result);
-  const recipe = RECIPES_INDEX[key] || {name:'Krautwasser',pts:0,desc:'Schmeckt nach nix.'};
+    const key = normalize(result);
+    const recipe = RECIPES_INDEX[key] || {name:'Krautwasser',pts:0,desc:'Schmeckt nach nix.'};
 
-  out.innerHTML = `
-    <div class="name">${recipe.name}</div>
-    <div class="desc">${recipe.desc || ''}</div>
-    <div class="reward">
-      <span class="badge">+${recipe.pts} Thaler</span> für den Rübensammler, welcher den Auftrag als erstes erfüllt!
-    </div>
-  `;
+    out.innerHTML = `
+      <div class="name">${recipe.name}</div>
+      <div class="desc">${recipe.desc || ''}</div>
+      <div class="reward">
+        <span class="badge">+${recipe.pts} Thaler</span> für den Rübensammler, welcher den Auftrag als erstes erfüllt!
+      </div>
+    `;
 
-  try { sndResult.currentTime = 0; sndResult.play(); } catch(e){}
-}
+    try { sndResult.currentTime = 0; sndResult.play(); } catch(e){}
+  }
 
+  function randomColor(){ 
+    return COLORS[Math.floor(Math.random()*COLORS.length)]; 
+  }
 
-
-  function randomColor(){ return COLORS[Math.floor(Math.random()*COLORS.length)]; }
   function setSymbol(reelEl,color){
-    const sym=reelEl.querySelector('.symbol');
-    sym.className='symbol '+color;
-    const img=new Image();
-    img.decoding='async';
-    img.alt=color+"e Rübe";
-    img.onload=()=>{ sym.innerHTML=''; sym.appendChild(img); };
-    img.onerror=()=>{ sym.innerHTML=SVG[color]; };
-    img.src=IMG[color];
+    const sym = reelEl.querySelector('.symbol');
+    sym.className = 'symbol ' + color;
+    const img = new Image();
+    img.decoding = 'async';
+    img.alt = color + 'e Rübe';
+    img.onload = ()=>{ sym.innerHTML=''; sym.appendChild(img); };
+    img.onerror = ()=>{ sym.innerHTML = SVG[color]; };
+    img.src = IMG[color];
   }
 
   // Startanzeige
-  reels.forEach(reel=> setSymbol(reel, randomColor()));
+  reels.forEach(reel => setSymbol(reel, randomColor()));
 
   function spin(){
-    btn.disabled=true; out.textContent='...suche Rezept für Ernteauftrag...';
+    btn.disabled = true;
+    out.innerHTML = `<div class="name">…suche Rezept für den Ernteauftrag…</div>`; // Platzhalter an Position des Namens
     try{ sndButton.currentTime=0; sndButton.play(); }catch(e){}
     try{ sndRattle.currentTime=0; sndRattle.play(); }catch(e){}
-    const finals=[];
+
+    const finals = [];
     reels.forEach((reel,i)=>{
-      let delay=1200+i*800;
-      const t=setInterval(()=> setSymbol(reel, randomColor()),150);
+      const t = setInterval(()=> setSymbol(reel, randomColor()), 150);
       setTimeout(()=>{
         clearInterval(t);
-        const c=randomColor();
-        setSymbol(reel,c);
-        finals[i]=c;
+        const c = randomColor();
+        setSymbol(reel, c);
+        finals[i] = c;
         try{ sndStop.currentTime=0; sndStop.play(); }catch(e){}
-        if(i===reels.length-1){
+
+        if(i === reels.length-1){
           try{ sndRattle.pause(); }catch(e){}
-          btn.disabled=false;
+          btn.disabled = false;
           evaluate(finals);
         }
-      },delay);
+      }, 1200 + i*800);
     });
   }
 
   if(btn){ btn.addEventListener('click', spin); }
-
-  // Orientation-Overlay aktivieren
-  checkOrientation();
-  window.addEventListener('resize',checkOrientation);
-  window.addEventListener('orientationchange',checkOrientation);
 });
 </script>
 </body>
