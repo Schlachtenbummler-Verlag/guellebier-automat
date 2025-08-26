@@ -1,76 +1,4 @@
-<!-- Vollständiger Güllebier-Automat mit eigenen Google-Drive-Sounds -->
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Güllebier-Automat</title>
-<style>
-  .gba{font-family:sans-serif;color:#fff;background:#222;padding:18px;border-radius:12px;max-width:680px;margin:auto}
-  .gba__header{text-align:center}
-  .gba__machine{margin:12px 0;text-align:center}
-  .gba__reels{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
-  .reel{background:#111;padding:10px;border-radius:8px}
-  .symbol{height:80px;display:flex;align-items:center;justify-content:center}
-  .gba__lever{background:#f8d24a;border:none;padding:8px 16px;font-weight:bold;border-radius:20px;cursor:pointer}
-  .gba__result{margin-top:12px;padding:8px;background:#111;border-radius:8px;min-height:50px}
-  .badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:8px;font-size:.8rem}
-  .desc{font-size:.85rem;color:#ccc;margin-top:4px}
-</style>
-</head>
-<body>
-<div id="guellebier-automat" class="gba">
-  <div class="gba__header">
-    <h2>🎰 Güllebier-Automat</h2>
-    <p class="gba__sub">Zieh den Hebel und braue dein Rezept!</p>
-  </div>
-
-  <div class="gba__machine">
-    <div class="gba__reels">
-      <div class="reel" data-index="0"><div class="symbol"></div></div>
-      <div class="reel" data-index="1"><div class="symbol"></div></div>
-      <div class="reel" data-index="2"><div class="symbol"></div></div>
-      <div class="reel" data-index="3"><div class="symbol"></div></div>
-    </div>
-    <button class="gba__lever" id="gbaSpin" type="button">Hebel ziehen</button>
-  </div>
-
-  <div class="gba__result" id="gbaResult"></div>
-</div>
-
-<!-- Eigene Sounds von Google Drive -->
-<audio id="sndButton" src="https://drive.google.com/uc?export=view&id=1XdYDLZ54YCjm_o4swkhiY41yBfuGoIC1"></audio>
-<audio id="sndRattle" src="https://drive.google.com/uc?export=view&id=1Q5bcT94ZZLhHVDK12xhD0FyyBOchv9Le" loop></audio>
-<audio id="sndStop" src="https://drive.google.com/uc?export=view&id=1c9T6lmeWIvzE5zqOKC3WvPWIAQCqZAF3"></audio>
-<audio id="sndResult" src="https://drive.google.com/uc?export=view&id=1hLNa9em7ZhGiFpe1h-OJnonYQrAZhClN"></audio>
-
-<script>
-document.addEventListener('DOMContentLoaded',()=>{
-  const reels = Array.from(document.querySelectorAll('.reel'));
-  const btn   = document.querySelector('#gbaSpin');
-  const out   = document.querySelector('#gbaResult');
-  const sndButton=document.getElementById('sndButton');
-  const sndRattle=document.getElementById('sndRattle');
-  const sndStop=document.getElementById('sndStop');
-  const sndResult=document.getElementById('sndResult');
-  const COLORS = ['rot','blau','gruen','gelb'];
-
-  const SVG = {
-    rot:`<svg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg' width='80' height='80'><path fill='#2b9e45' d='M42 10c6 1 10 6 10 12-6-2-11-6-10-12zM37 9c-2 5-8 10-15 10 3-7 9-11 15-10z'/><path fill='#d94a4a' d='M31 18c10 0 19 8 19 18S43 54 31 54 12 45 12 36s9-18 19-18z'/></svg>`,
-    blau:`<svg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg' width='80' height='80'><path fill='#2c9aa7' d='M42 10c6 1 10 6 10 12-6-2-11-6-10-12zM37 9c-2 5-8 10-15 10 3-7 9-11 15-10z'/><path fill='#3a7bd5' d='M31 18c10 0 19 8 19 18S43 54 31 54 12 45 12 36s9-18 19-18z'/></svg>`,
-    gruen:`<svg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg' width='80' height='80'><path fill='#1f8a4c' d='M42 10c6 1 10 6 10 12-6-2-11-6-10-12zM37 9c-2 5-8 10-15 10 3-7 9-11 15-10z'/><path fill='#2ecc71' d='M31 18c10 0 19 8 19 18S43 54 31 54 12 45 12 36s9-18 19-18z'/></svg>`,
-    gelb:`<svg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg' width='80' height='80'><path fill='#79b92f' d='M42 10c6 1 10 6 10 12-6-2-11-6-10-12zM37 9c-2 5-8 10-15 10 3-7 9-11 15-10z'/><path fill='#f5d142' d='M31 18c10 0 19 8 19 18S43 54 31 54 12 45 12 36s9-18 19-18z'/></svg>`
-  };
-
-  const RECIPES = {
-    'rot,rot,rot,rot': {name:'Dösselheimer Doppelbock',pts:35,desc:'Stark wie ein Pflug – nur im Stehen genießen.'},
-    'blau,blau,blau,blau': {name:'Leberknebel Spezial',pts:35,desc:'Klemmt zuverlässig. Arzt danach konsultieren.'},
-    'gruen,gruen,gruen,gruen': {name:'Braune Soße Pur',pts:35,desc:'Zähflüssig, herzhaft – löst Schrauben und Sorgen.'},
-    'gelb,gelb,gelb,gelb': {name:'Flotter Otto Hell',pts:35,desc:'Rinnt wie der Bach bei Schwitzwasser. Gute Reise!'},
-    'rot,rot,rot,blau': {name:'Klemritzer Nierenquetscher',pts:32,desc:'Massiert die Organe von innen.'},
-    'rot,rot,rot,gruen': {name:'Rülpsheimer Starkbier',pts:32,desc:'Schenkt Bass im Bauch.'},
-    'rot,rot,rot,gelb': {name:'Lästerhainer Jodelsprudel',pts:32,desc:'Nach zwei Schlucken singst du.'},
-    'blau,blau,blau,rot': {name:'Donnerburger Steißtritt',pts:31,desc:'Trifft sicher.'},
-    'blau,blau,blau,gruen': {name:'Hassnitzer Kellerbräu',pts:31,desc:'Aus dem dunklen Fass.'},
-    'blau,blau,blau,gelb': {name:'Stinkhornsuppe Spezial',pts:31,desc:'Duftet nach Abenteuer.'},
+.'},
     'gruen,gruen,gruen,rot': {name:'Plärrener Humpentrunk',pts:30,desc:'Groß im Glas, laut im Kopf.'},
     'gruen,gruen,gruen,blau': {name:'Hassburger Urstoff',pts:30,desc:'Nährt wie Brot.'},
     'gruen,gruen,gruen,gelb': {name:'Dreschmarer Magenhieb',pts:30,desc:'Direkt und unvergesslich.'},
@@ -113,36 +41,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   function setSymbol(reelEl,color){
     const sym=reelEl.querySelector('.symbol');
     sym.className='symbol '+color;
-    sym.innerHTML=SVG[color];
+    const img=new Image();
+    img.alt=color+"e Rübe";
+    img.onload=()=>{ sym.innerHTML=''; sym.appendChild(img); };
+    img.onerror=()=>{ sym.innerHTML=SVG[color]; };
+    img.src=IMG[color];
   }
 
   reels.forEach(reel=> setSymbol(reel, randomColor()));
 
   function spin(){
-    btn.disabled=true; out.textContent='…braut…';
-    sndButton.currentTime=0; sndButton.play();
-    sndRattle.currentTime=0; sndRattle.play();
-    const finals=[];
-    reels.forEach((reel,i)=>{
-      let delay=1200+i*800;
-      const t=setInterval(()=> setSymbol(reel, randomColor()),150);
-      setTimeout(()=>{
-        clearInterval(t);
-        const c=randomColor();
-        setSymbol(reel,c);
-        finals[i]=c;
-        sndStop.currentTime=0; sndStop.play();
-        if(i===reels.length-1){
-          sndRattle.pause();
-          btn.disabled=false;
-          evaluate(finals);
-        }
-      },delay);
-    });
-  }
-
-  btn.addEventListener('click',spin);
-});
-</script>
-</body>
-</html>
+    btn.disabled=true; out.textContent='…brau
