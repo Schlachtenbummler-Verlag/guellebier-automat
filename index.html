@@ -1,0 +1,154 @@
+<!-- Vollständiger Güllebier-Automat mit allen Rezepten -->
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Güllebier-Automat</title>
+<style>
+  .gba{font-family:sans-serif;color:#fff;background:#222;padding:18px;border-radius:12px;max-width:680px;margin:auto}
+  .gba__header{text-align:center}
+  .gba__machine{margin:12px 0;text-align:center}
+  .gba__reels{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+  .reel{background:#111;padding:10px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+  .symbol{width:90px;height:90px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .symbol img{width:100%;height:100%;object-fit:contain;display:block}
+  .symbol svg{width:100%;height:100%;display:block}
+  .gba__lever{background:#f8d24a;border:none;padding:8px 16px;font-weight:bold;border-radius:20px;cursor:pointer}
+  .gba__result{margin-top:12px;padding:8px;background:#111;border-radius:8px;min-height:50px}
+  .badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:8px;font-size:.8rem}
+  .desc{font-size:.85rem;color:#ccc;margin-top:4px}
+</style>
+</head>
+<body>
+<div id="guellebier-automat" class="gba">
+  <div class="gba__header">
+    <h2>Güllebier-Rezepte-Automat</h2>
+    <p class="gba__sub">Drück den Knopf und erhaltet euren nächsten Ernteauftrag!</p>
+  </div>
+
+  <div class="gba__machine">
+    <div class="gba__reels">
+      <div class="reel" data-index="0"><div class="symbol"></div></div>
+      <div class="reel" data-index="1"><div class="symbol"></div></div>
+      <div class="reel" data-index="2"><div class="symbol"></div></div>
+      <div class="reel" data-index="3"><div class="symbol"></div></div>
+    </div>
+    <button class="gba__lever" id="gbaSpin" type="button">Knopf drücken</button>
+  </div>
+
+  <div class="gba__result" id="gbaResult"></div>
+</div>
+
+<!-- Eigene Sounds -->
+<audio id="sndButton" src="assets/snd/button.mp3"></audio>
+<audio id="sndRattle" src="assets/snd/dreh.mp3" loop></audio>
+<audio id="sndStop" src="assets/snd/anhalten.mp3"></audio>
+<audio id="sndResult" src="assets/snd/ergebnis.mp3"></audio>
+
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const reels = Array.from(document.querySelectorAll('.reel'));
+  const btn   = document.querySelector('#gbaSpin');
+  const out   = document.querySelector('#gbaResult');
+  const sndButton=document.getElementById('sndButton');
+  const sndRattle=document.getElementById('sndRattle');
+  const sndStop=document.getElementById('sndStop');
+  const sndResult=document.getElementById('sndResult');
+  const COLORS = ['rot','blau','gruen','gelb'];
+
+  const IMG = {
+    rot:'assets/img/rot.png',
+    blau:'assets/img/blau.png',
+    gruen:'assets/img/gruen.png',
+    gelb:'assets/img/gelb.png'
+  };
+
+  const RECIPES = {
+    'rot,rot,rot,rot': {name:'Dösselheimer Doppelbock',pts:35,desc:'Stark wie ein Pflug – nur im Stehen genießen.'},
+    'blau,blau,blau,blau': {name:'Leberknebel Spezial',pts:35,desc:'Klemmt zuverlässig. Arzt danach konsultieren.'},
+    'gruen,gruen,gruen,gruen': {name:'Braune Soße Pur',pts:35,desc:'Zähflüssig, herzhaft – löst Schrauben und Sorgen.'},
+    'gelb,gelb,gelb,gelb': {name:'Flotter Otto Hell',pts:35,desc:'Rinnt wie der Bach bei Schwitzwasser. Gute Reise!'},
+    'rot,rot,rot,blau': {name:'Klemritzer Nierenquetscher',pts:32,desc:'Massiert die Organe von innen.'},
+    'rot,rot,rot,gruen': {name:'Rülpsheimer Starkbier',pts:32,desc:'Schenkt Bass im Bauch.'},
+    'rot,rot,rot,gelb': {name:'Lästerhainer Jodelsprudel',pts:32,desc:'Nach zwei Schlucken singst du.'},
+    'blau,blau,blau,rot': {name:'Donnerburger Steißtritt',pts:31,desc:'Trifft sicher.'},
+    'blau,blau,blau,gruen': {name:'Hassnitzer Kellerbräu',pts:31,desc:'Aus dem dunklen Fass.'},
+    'blau,blau,blau,gelb': {name:'Stinkhornsuppe Spezial',pts:31,desc:'Duftet nach Abenteuer.'},
+    'gruen,gruen,gruen,rot': {name:'Plärrener Humpentrunk',pts:30,desc:'Groß im Glas, laut im Kopf.'},
+    'gruen,gruen,gruen,blau': {name:'Hassburger Urstoff',pts:30,desc:'Nährt wie Brot.'},
+    'gruen,gruen,gruen,gelb': {name:'Dreschmarer Magenhieb',pts:30,desc:'Direkt und unvergesslich.'},
+    'gelb,gelb,gelb,rot': {name:'Kratziger Göttertrunk',pts:29,desc:'Schmeckt göttlich.'},
+    'gelb,gelb,gelb,blau': {name:'Ynnors Schlaftrunk',pts:29,desc:'Wirkt sofort.'},
+    'gelb,gelb,gelb,gruen': {name:'Schwitzwasser Dünnbier',pts:29,desc:'Leicht bekömmlich.'},
+    'rot,rot,blau,blau': {name:'Beißburger Hamsterwurf',pts:23,desc:'Zwei Paare, ein Ziel.'},
+    'rot,rot,gruen,gruen': {name:'Ningelner Nostalgiker',pts:22,desc:'Schmeckt nach früher.'},
+    'rot,rot,gelb,gelb': {name:'Stockheimer Knollentrunk',pts:21,desc:'Dick im Glas.'},
+    'blau,blau,gruen,gruen': {name:'Feldschorle Spezial',pts:20,desc:'Halb Wiese, halb Wolke.'},
+    'blau,blau,gelb,gelb': {name:'Rübensprudel Deluxe',pts:19,desc:'Perlt wie Gerüchte.'},
+    'gruen,gruen,gelb,gelb': {name:'Krauttrunk Extra Herb',pts:18,desc:'Kratzig im Abgang.'},
+    'rot,rot,blau,gruen': {name:'Bierleichen Mix',pts:17,desc:'Für Nächte ohne Erinnerung.'},
+    'rot,rot,blau,gelb': {name:'Doppelacker Sud',pts:16,desc:'Zweifeldrig gebraut.'},
+    'rot,rot,gruen,gelb': {name:'Erntetrunk',pts:15,desc:'Wie Feierabend.'},
+    'blau,blau,rot,gruen': {name:'Feldweg Fusel',pts:14,desc:'Holprig, aber zielstrebig.'},
+    'blau,blau,rot,gelb': {name:'Ackerbowle',pts:13,desc:'Mit allem drin.'},
+    'blau,blau,gruen,gelb': {name:'Lumpas Limo',pts:12,desc:'Süß und frech.'},
+    'gruen,gruen,rot,blau': {name:'Hopfenrübe Hell',pts:11,desc:'Leichtfüßig.'},
+    'gruen,gruen,rot,gelb': {name:'Ackerschorle',pts:10,desc:'Halb Arbeit, halb Pause.'},
+    'gruen,gruen,blau,gelb': {name:'Gärtnerpils',pts:9,desc:'Blüht im Glas.'},
+    'gelb,gelb,rot,blau': {name:'Rübenschnaps',pts:8,desc:'Kurz, kräftig.'},
+    'gelb,gelb,rot,gruen': {name:'Knollentrunk Spezial',pts:7,desc:'Rund im Mund.'},
+    'gelb,gelb,blau,gruen': {name:'Hamstersud',pts:7,desc:'Schnell getrunken.'},
+    'rot,blau,gruen,gelb': {name:'Querbeet Bier',pts:1,desc:'Von allem ein bisschen.'}
+  };
+
+  const RECIPES_INDEX={};
+  Object.keys(RECIPES).forEach(k=>{ RECIPES_INDEX[k.split(',').sort().join(',')] = RECIPES[k]; });
+
+  function normalize(combo){ return combo.slice().sort().join(','); }
+  function evaluate(result){
+    const key=normalize(result);
+    const recipe=RECIPES_INDEX[key]||{name:'Krautwasser',pts:0,desc:'Schmeckt nach nix.'};
+    out.innerHTML=`<div class="name">${recipe.name} <span class="badge">+${recipe.pts} Punkte</span></div><div class="desc">${recipe.desc||''}</div>`;
+    sndResult.currentTime=0; sndResult.play();
+  }
+
+  function randomColor(){ return COLORS[Math.floor(Math.random()*COLORS.length)]; }
+  function setSymbol(reelEl,color){
+    const sym=reelEl.querySelector('.symbol');
+    sym.className='symbol '+color;
+    const img=new Image();
+    img.alt=color+"e Rübe";
+    img.onload=()=>{ sym.innerHTML=''; sym.appendChild(img); };
+    img.onerror=()=>{ sym.innerHTML=SVG[color]; };
+    img.src=IMG[color];
+  }
+
+  reels.forEach(reel=> setSymbol(reel, randomColor()));
+
+  function spin(){
+    btn.disabled=true; out.textContent='...sucht Rezept...';
+    sndButton.currentTime=0; sndButton.play();
+    sndRattle.currentTime=0; sndRattle.play();
+    const finals=[];
+    reels.forEach((reel,i)=>{
+      let delay=1200+i*800;
+      const t=setInterval(()=> setSymbol(reel, randomColor()),150);
+      setTimeout(()=>{
+        clearInterval(t);
+        const c=randomColor();
+        setSymbol(reel,c);
+        finals[i]=c;
+        sndStop.currentTime=0; sndStop.play();
+        if(i===reels.length-1){
+          sndRattle.pause();
+          btn.disabled=false;
+          evaluate(finals);
+        }
+      },delay);
+    });
+  }
+
+  btn.addEventListener('click',spin);
+});
+</script>
+</body>
+</html>
