@@ -1,1 +1,1 @@
-# guellebier-automat
+# guellebier-rezepte-automat
