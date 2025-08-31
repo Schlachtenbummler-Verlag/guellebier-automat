@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Saxonischer Automat (Design-Space 1920×1080)</title>
+<style>
+  /* ====== Design-Space Grundwerte ====== */
+  :root{
+    /* feste Bühne */
+    --design-w: 1920;
+    --design-h: 1080;
+
+    /* Reel-Fenster (PX in 1920×1080) */
+    --r-top:   340;   /* y */
+    --r-w:     270;   /* width */
+    --r-h:     270;   /* height */
+    --r0-left: 300;   /* x */
+    --r1-left: 640;
+    --r2-left: 980;
+    --r3-left: 1320;
+
+    /* Ergebnisfenster (PX) */
+    --res-left: 280;
+    --res-top:  740;
+    --res-w:    1360;
+    --res-h:    200;
+
+    /* Hebel/Lampen (PX, Zentrum) */
+    --lever-x: 150;
+    --lever-y: 560;
+    --lamps-x: 1770;
+    --lamps-y: 520;
+
+    /* Proportionale Skalen innerhalb des Design-Space */
+    --reel-scale: 1;
+    --lever-scale: 1;
+    --lamps-scale: 1;
+
+    /* UI Buttons (gleich groß) */
+    --ui-btn-w: 220px;
+    --ui-btn-h: 52px;
+    --ui-opacity: 0.85;         /* nur Hintergrund/Border */
+    --ui-radius: 12px;
+    --ui-pad-x: 14px;
+    --ui-pad-y: 10px;
+
+    /* Sound & Exit Position (Canvas-Koordinaten) */
+    --sound-x: 12px;
+    --sound-y: 12px;
+    --exit-x:  12px;
+    --exit-y:  72px;
+
+    /* Farben */
+    --lamp-red:   #ff4d4d;
+    --lamp-green: #4cd964;
+    --lamp-blue:  #4da6ff;
+    --lamp-gold:  #ffd400;
+
+    /* Ergebnis-Text */
+    --result-name-color:   #ffffff;
+    --result-desc-color:   #e8e8e8;
+    --result-points-color: #ffd24a;
+    --result-name-size:    32px; /* px */
+    --result-desc-size:    24px; /* px */
+    --result-points-size:  26px; /* px */
+
+    /* Schimmer */
+    --shine-angle: 120deg;
+    --shine-core:  .20;
+    --shine-speed: 9s;      /* globaler Sweep */
+    --scan-angle:  180deg;
+    --scan-thickness: 1px;
+    --scan-spacing:  3px;
+    --scan-bright: rgba(255,255,255,.08);
+    --scan-dark:   rgba(0,0,0,0);
+    --scan-opacity: .22;
+    --scan-blend: overlay;
+
+    /* Lampen */
+    --lamps-gap: 10px;
+    --lamp-afterglow: 4.2s;
+
+    /* Sound */
+    --sound-enabled: 1;
+
+    /* Debug Farben */
+    --outline-reel:   #4dbbff;
+    --outline-result: #59ffa1;
+
+    /* Buttons Label (nur Info) */
+    --exit-label:  "Beenden";
+    --sound-label: "Sound";
+
+    /* Startscreen */
+    --start-bg: #000;
+    --start-fg: #fff;
+
+    /* Hebel-Grenzen */
+    --lever-bottom-clearance: 6;   /* px Luft bis Schlitz-Ende (Sicherheitsabstand) */
+    --lever-ring-offset: 52;       /* Abstand: Knauf-Y → Ring-Oberkante */
+    --lever-ring-h: 8;             /* Ring-Höhe (px) */
+  }
+
+  /* Override (dein Standard-Layout) */
+  :root{
+    --r-top: 345;
+    --r-w: 315;
+    --r-h: 271;
+    --r0-left: 313;
+    --r1-left: 633;
+    --r2-left: 952;
+    --r3-left: 1273;
+    --res-left: 340;
+    --res-top: 730;
+    --res-w: 1230;
+    --res-h: 250;
+    --lever-x: 162;
+    --lever-y: 546;
+    --lamps-x: 1744;
+    --lamps-y: 492;
+    --reel-scale: 1;
+    --lever-scale: 1.5;
+    --lamps-scale: 0.87;
+    --lamps-gap: 49px;
+    --lamp-afterglow: 3.2s;
+    --ui-btn-w: 124px;
+    --ui-btn-h: 46px;
+    --ui-opacity: 0.85;
+    --shine-core: .20;
+    --shine-speed: 9s;
+    --shine-angle: 120deg;
+    --scan-thickness: 1.5px;
+    --scan-spacing: 3px;
+    --scan-opacity: 0.3;
+    --scan-blend: overlay;
+    --result-name-size: 45px;
+    --result-desc-size: 40px;
+    --result-points-size: 35px;
+    --result-name-color: #008040;
+    --result-desc-color: #008040;
+    --result-points-color: #008040;
+    --scan-angle: 180deg;
+    --scan-bright: #00ff40;
+    --scan-dark: #004000;
+    --sound-x: 80px;
+    --sound-y: 826px;
+    --exit-x: 80px;
+    --exit-y: 905px;
+    --sound-enabled: 1;
+  }
+
+  /* ===== Animierbare Custom Properties für Fit & Shake ===== */
+  @property --fit-x      { syntax:"<length>"; inherits:false; initial-value: 0px; }
+  @property --fit-y      { syntax:"<length>"; inherits:false; initial-value: 0px; }
+  @property --fit-scale  { syntax:"<number>"; inherits:false; initial-value: 1; }
+  @property --shake-x    { syntax:"<length>"; inherits:false; initial-value: 0px; }
+  @property --shake-y    { syntax:"<length>"; inherits:false; initial-value: 0px; }
+  @property --shake-rot  { syntax:"<angle>";  inherits:false; initial-value: 0deg; }
+  @property --shake-mag  { syntax:"<length>"; inherits:false; initial-value: 4px; }
+  @property --shake-rot-mag { syntax:"<angle>"; inherits:false; initial-value: .2deg; }
+  @property --shake-sign { syntax:"<number>"; inherits:false; initial-value: 1; }
+
+  /* Seite & Bühne */
+  html,body{margin:0;padding:0;height:100%;background:#000;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Helvetica,Arial,sans-serif; -webkit-text-size-adjust:100%}
+  .stage{position:fixed;inset:0;display:grid;place-items:center; background:#000; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+
+  .canvas{
+    position:relative;
+    width: calc(var(--design-w) * 1px);
+    height: calc(var(--design-h) * 1px);
+    /* Fit/Zentrierung + Shake werden komponiert */
+    transform-origin: top left;
+    transform:
+      translate(var(--fit-x), var(--fit-y))
+      scale(var(--fit-scale))
+      translate(var(--shake-x), var(--shake-y))
+      rotate(var(--shake-rot));
+    image-rendering: auto;
+  }
+
+  .plate__img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:7;pointer-events:none;}
+
+  .global-sweep{position:absolute; inset:0; z-index:4; pointer-events:none; overflow:hidden;}
+  .global-sweep__stripe{
+    position:absolute; top:0; bottom:0; left:-120%; width:120%;
+    background:linear-gradient(var(--shine-angle),
+      rgba(255,255,255,0) 30%,
+      rgba(255,255,255,var(--shine-core)) 50%,
+      rgba(255,255,255,0) 70%);
+    transform:skewX(-20deg);
+    animation:sweep var(--shine-speed) linear infinite;
+  }
+  .apply-clip{ clip-path: url(#winClip); }
+  @keyframes sweep{ from{ left:-120%; } to{ left:120%; } }
+  .reels.spinning ~ .global-sweep{ display:none; }
+
+  .reels{position:absolute; inset:0; z-index:1; transform:scale(var(--reel-scale)); transform-origin:center;}
+  .reel{
+    position:absolute;
+    top:  calc(var(--r-top) * 1px);
+    width:calc(var(--r-w)   * 1px);
+    height:calc(var(--r-h)  * 1px);
+    display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:10px;
+    background:#111; padding:10px; box-shadow: inset 0 2px 10px rgba(0,0,0,.6), 0 8px 18px rgba(0,0,0,.25);
+  }
+  #reel-0{left:calc(var(--r0-left) * 1px);}
+  #reel-1{left:calc(var(--r1-left) * 1px);}
+  #reel-2{left:calc(var(--r2-left) * 1px);}
+  #reel-3{left:calc(var(--r3-left) * 1px);}
+
+  .reel::before, .reel::after{ content:""; position:absolute; left:0; right:0; height:22%; pointer-events:none; z-index:3; }
+  .reel::before{ top:0;    background:linear-gradient(to bottom, rgba(0,0,0,.6), rgba(0,0,0,0)); }
+  .reel::after { bottom:0; background:linear-gradient(to top,    rgba(0,0,0,.6), rgba(0,0,0,0)); }
+
+  .reel .sweep{ display:none !important; }
+
+  .symbol{ position:relative; width:80%; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; overflow:hidden; will-change: transform, filter; transition: filter .2s ease; }
+  .symbol img{width:100%;height:100%;object-fit:contain;display:block;}
+
+  .reel.spinning .symbol{ filter: blur(3px) saturate(1.1); animation: spin-jitter .12s linear infinite; }
+  @keyframes spin-jitter{ 0%{transform:translateY(-3%)} 50%{transform:translateY(3%)} 100%{transform:translateY(-3%)} }
+  .reel.spinning .streak{
+    position:absolute; inset:-30% -10%;
+    background:linear-gradient(90deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.25) 50%, rgba(255,255,255,0) 70%);
+    filter: blur(6px); opacity:.18; transform: rotate(12deg);
+    animation: streak .5s linear infinite; pointer-events:none; z-index:4;
+  }
+  @keyframes streak{ from{transform:rotate(12deg) translateX(-8%)} to{transform:rotate(12deg) translateX(8%)} }
+  .reel.stop-bounce .symbol{ animation: stop-bounce .32s cubic-bezier(.2,.8,.2,1) 1; filter:none; }
+  @keyframes stop-bounce{ 0%{transform:translateY(10%)} 60%{transform:translateY(-4%)} 100%{transform:translateY(0)} }
+
+  .result{
+    position:absolute;
+    left: calc(var(--res-left) * 1px);
+    top:  calc(var(--res-top)  * 1px);
+    width:calc(var(--res-w)    * 1px);
+    height:calc(var(--res-h)   * 1px);
+    display:grid; place-items:center; text-align:center; padding:8px 10px; z-index:0; line-height:1.25;
+    overflow:hidden;
+  }
+  .result-inner{ display:grid; gap:.35rem; position:relative; z-index:1; }
+  .result-inner .name{ color:var(--result-name-color);   font-size:var(--result-name-size);   font-weight:800; letter-spacing:.02em; }
+  .result-inner .desc{ color:var(--result-desc-color);   font-size:var(--result-desc-size);   opacity:.95; }
+  .result-inner .points{ color:var(--result-points-color); font-size:var(--result-points-size); font-weight:700; }
+
+  .result::after{
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background: repeating-linear-gradient(
+      var(--scan-angle),
+      var(--scan-bright) 0,
+      var(--scan-bright) var(--scan-thickness),
+      var(--scan-dark)   var(--scan-thickness),
+      var(--scan-dark)   calc(var(--scan-thickness) + var(--scan-spacing))
+    );
+    mix-blend-mode: var(--scan-blend);
+    opacity: var(--scan-opacity);
+    z-index:0;
+  }
+
+  .lever-area{
+    position:absolute;
+    left: calc(var(--lever-x) * 1px);
+    top:  calc(var(--lever-y) * 1px);
+    transform:translate(-50%,-50%) scale(var(--lever-scale));
+    z-index:8;
+  }
+  .lever{ width:72px; height:300px; position:relative; cursor:grab; user-select:none; touch-action:none; filter: drop-shadow(0 6px 14px rgba(0,0,0,.35)); }
+  .lever__back{ position:absolute; inset:0; border-radius:10px; background:linear-gradient(180deg,#1a1a1a,#0f0f0f); box-shadow: inset 0 6px 10px rgba(0,0,0,.6), inset 0 -6px 10px rgba(0,0,0,.4); }
+  .lever__slot{ position:absolute; left:50%; top:14px; bottom:14px; width:12px; transform:translateX(-50%); background:#080808; border-radius:8px; box-shadow: inset 0 0 10px rgba(0,0,0,.9); }
+  .lever__arm{ position:absolute; left:50%; top:22px; width:6px; bottom:22px; transform:translateX(-50%); background:linear-gradient(180deg,#555,#2a2a2a); border-radius:3px; box-shadow: inset 0 0 4px rgba(0,0,0,.6); }
+  .lever__knob{
+    --y:0px; position:absolute; left:50%; top:0; width:56px; height:56px; transform:translate(-50%, var(--y));
+    border-radius:50%;
+    background: radial-gradient(circle at 30% 30%, #ffb8b8, #ff4a4a 45%, #d33c3c 75%, #8a1d1d 100%);
+    box-shadow: 0 10px 18px rgba(0,0,0,.45), inset 0 2px 0 rgba(255,255,255,.35);
+    overflow:hidden;
+  }
+  .lever__knob::after{
+    content:""; position:absolute; inset:0; border-radius:50%;
+    background:linear-gradient(120deg, rgba(255,255,255,.65) 0%, rgba(255,255,255,0) 40%);
+    mix-blend-mode:screen; opacity:.35; pointer-events:none; animation: knobShine 3s linear infinite;
+  }
+  @keyframes knobShine{ from{ transform:translateX(-100%) rotate(25deg);} to{ transform:translateX(100%) rotate(25deg);} }
+  .lever__ring{ position:absolute; left:50%; width:32px; height:8px; transform:translate(-50%, calc(var(--y) + 52px)); background:linear-gradient(180deg,#777,#333); border-radius:8px; filter:blur(.2px); }
+
+  .lamps-area{
+    position:absolute;
+    left: calc(var(--lamps-x) * 1px);
+    top:  calc(var(--lamps-y) * 1px);
+    transform:translate(-50%,-50%) scale(var(--lamps-scale));
+    z-index:8;
+    display:flex; flex-direction:column; gap: max(var(--lamps-gap), 8px);
+  }
+  @supports not (gap: 1px) {
+    .lamps-area .lamp + .lamp{ margin-top: max(var(--lamps-gap), 8px); }
+  }
+
+  .lamp{
+    pointer-events:none; user-select:none; min-width:160px; height:56px; padding:0 16px;
+    display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;
+    border-radius:32px; background:linear-gradient(180deg,#2f2f2f,#161616);
+    box-shadow: inset 0 4px 10px rgba(0,0,0,.7), inset 0 -4px 8px rgba(0,0,0,.5);
+  }
+  .lamp__label{ font-weight:900; letter-spacing:.08em; text-transform:uppercase; color:#8a8aa0; text-shadow: 0 1px 0 rgba(0,0,0,.6); }
+  .lamp__shine{ content:""; position:absolute; inset:0; background: radial-gradient(ellipse at 50% -30%, rgba(255,255,255,.25), rgba(255,255,255,0) 45%); opacity:.35; mix-blend-mode:screen; }
+
+  .lamp--red.active{   background: radial-gradient(circle at 50% 20%, #ffd6d6 0%, #ff4d4d 40%, #b11717 70%, #4a0a0a 100%); box-shadow: 0 0 18px 6px rgba(255,80,80,.55), 0 0 36px 16px rgba(255,80,80,.22); animation: lampPulse 1.2s ease-out 1; }
+  .lamp--green.active{ background: radial-gradient(circle at 50% 20%, #eaffea 0%, #4cd964 40%, #1db954 70%, #0e3f1d 100%); box-shadow: 0 0 18px 6px rgba(80,255,120,.55), 0 0 36px 16px rgba(80,255,120,.22); animation: lampPulse 1.2s ease-out 1; }
+  .lamp--blue.active{  background: radial-gradient(circle at 50% 20%, #e2efff 0%, #4da6ff 40%, #175ab1 70%, #0a224a 100%); box-shadow: 0 0 18px 6px rgba(80,120,255,.55), 0 0 36px 16px rgba(80,120,255,.22); animation: lampPulse 1.2s ease-out 1; }
+  .lamp--gold.active{  background:#FFD400; box-shadow: 0 0 18px 6px rgba(255,212,0,.65), 0 0 36px 16px rgba(255,212,0,.28); animation: lampPulse 1.2s ease-out 1; }
+  @keyframes lampPulse{ 0%{box-shadow:0 0 0 0 rgba(255,255,255,0)} 60%{box-shadow:0 0 28px 12px rgba(255,255,255,.65)} 100%{box-shadow:0 0 18px 6px rgba(255,255,255,.4)} }
+  .lamp.glow::after{ content:""; position:absolute; inset:-10px; border-radius:inherit; opacity:0; filter: blur(10px); pointer-events:none; animation: afterglow var(--lamp-afterglow) ease-out forwards; }
+  .lamp--gold.glow::after { background: radial-gradient(ellipse at 50% 50%, rgba(255,212,0,.90), rgba(255,212,0,.45) 42%, rgba(255,212,0,0) 70%); }
+  .lamp--red.glow::after  { background: radial-gradient(ellipse at 50% 50%, rgba(255,110,110,.85), rgba(255,80,80,.35) 40%, rgba(255,80,80,0) 70%); }
+  .lamp--green.glow::after{ background: radial-gradient(ellipse at 50% 50%, rgba(120,255,160,.85), rgba(80,255,120,.35) 40%, rgba(80,255,120,0) 70%); }
+  .lamp--blue.glow::after { background: radial-gradient(ellipse at 50% 50%, rgba(140,180,255,.85), rgba(100,140,255,.35) 40%, rgba(100,140,255,0) 70%); }
+
+  .debug .reel{ outline:2px dashed var(--outline-reel); outline-offset:-2px; }
+  .debug .result{ outline:2px dashed var(--outline-result); }
+  .debug .lever-area{ outline:2px dashed #ff8a00; outline-offset:4px; }
+
+  /* zufälliger Canvas-Shake (beidseitig) über Variablen */
+  @keyframes machine-shake {
+    0%   { --shake-x: 0px;                                --shake-y: 0px;                                --shake-rot: 0deg; }
+    20%  { --shake-x: calc( .5 * var(--shake-mag) * var(--shake-sign));  --shake-y: calc(-.5 * var(--shake-mag)); --shake-rot: calc(-1 * var(--shake-rot-mag) * var(--shake-sign)); }
+    40%  { --shake-x: calc(-.5 * var(--shake-mag) * var(--shake-sign));  --shake-y: calc( .5 * var(--shake-mag)); --shake-rot: calc( 1 * var(--shake-rot-mag) * var(--shake-sign)); }
+    60%  { --shake-x: calc( .3 * var(--shake-mag) * var(--shake-sign));  --shake-y: calc(-.3 * var(--shake-mag)); --shake-rot: calc(-.6 * var(--shake-rot-mag) * var(--shake-sign)); }
+    80%  { --shake-x: calc(-.3 * var(--shake-mag) * var(--shake-sign));  --shake-y: calc( .3 * var(--shake-mag)); --shake-rot: calc( .6 * var(--shake-rot-mag) * var(--shake-sign)); }
+    100% { --shake-x: 0px;                                --shake-y: 0px;                                --shake-rot: 0deg; }
+  }
+  .canvas.shake { animation: machine-shake 320ms ease; }
+
+  .ui-fixed-btn{
+    position:absolute; z-index:12; display:inline-flex; align-items:center; justify-content:center;
+    width:var(--ui-btn-w); height:var(--ui-btn-h);
+    padding:var(--ui-pad-y) var(--ui-pad-x);
+    border-radius:var(--ui-radius);
+    border:1px solid rgba(255,255,255,calc(var(--ui-opacity)*.7));
+    background: rgba(20,20,20,var(--ui-opacity));
+    color:#fff; cursor:pointer; font-weight:800; letter-spacing:.02em;
+    backdrop-filter: blur(4px);
+    box-sizing:border-box;
+  }
+  /* Buttons jetzt im Canvas (schütteln mit) */
+  #soundToggle{ left:var(--sound-x); top:var(--sound-y); }
+  #exitBtn{ left:var(--exit-x); top:var(--exit-y); text-decoration:none; }
+
+  /* Debug-Button bleibt bewusst fix im Viewport */
+  #dbgToggle{ position:fixed; right:12px; bottom:12px; z-index:2147483647; }
+
+  #dbgPanel{ position:fixed; right:12px; bottom:64px; width:min(92vw,420px); max-height:72vh; overflow:auto; z-index:2147483600; background:#0b0b0b; color:#fff; border:1px solid #333; border-radius:14px; box-shadow:0 12px 28px rgba(0,0,0,.5); display:none; }
+  #dbgPanel header{ position:sticky; top:0; padding:10px 12px; background:#101010; border-bottom:1px solid #222; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:move; }
+  #dbgPanel header h4{ margin:0; font-size:1rem; }
+  #dbgPanel .grp{ padding:10px 12px; border-top:1px solid #1a1a1a; }
+  #dbgPanel .row{ display:grid; grid-template-columns: 1fr auto; align-items:center; gap:8px; margin:6px 0; }
+  #dbgPanel label{ font-size:.9rem; color:#ddd; }
+  #dbgPanel input[type="range"]{ width:100%; }
+  #dbgPanel input[type="number"]{ width:110px; background:#000; color:#fff; border:1px solid #333; border-radius:8px; padding:6px; }
+  #dbgPanel input[type="color"]{ width:42px; height:32px; padding:0; border:none; background:transparent; }
+  #dbgPanel input[type="text"]{ width:100%; background:#000; color:#fff; border:1px solid #333; border-radius:8px; padding:6px; }
+
+  .startscreen{
+    position:fixed; inset:0; display:grid; place-items:center; z-index:2147483602;
+    background:var(--start-bg); color:var(--start-fg);
+  }
+  .startscreen button{
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width: 280px; min-height:64px; padding:16px 22px;
+    border-radius:16px; border:2px solid #fff; background:#111; color:#fff; font-size:1.15rem; font-weight:900; letter-spacing:.03em; cursor:pointer;
+  }
+  .start-panel{
+    max-width: min(1100px, 92vw);
+    color:#eee;
+    text-align:left;
+    padding: 0 16px 28px;
+  }
+  .start-panel .intro{
+    font-style: italic;
+    font-size: clamp(18px, 2.2vw, 26px);
+    line-height: 1.45;
+    margin: 0 0 16px 0;
+  }
+  .start-panel h2{ margin: 8px 0 6px 0; font-size: clamp(22px, 2.4vw, 32px); letter-spacing:.02em; }
+  .start-panel ol{
+    margin: 6px 0 0 1.2em;
+    padding:0;
+    font-size: clamp(16px, 1.8vw, 22px);
+    line-height:1.45;
+  }
+  .start-actions{ margin-top: 18px; display:flex; justify-content:center; }
+
+  #rotateOverlay{position:fixed;inset:0;display:none;z-index:9999;background:rgba(0,0,0,.9);color:#FFD700;align-items:center;justify-content:center;text-align:center;padding:20px;box-sizing:border-box}
+
+  /* === PROD: Debug-UI abschalten === */
+  #dbgToggle, #dbgPanel { display: none !important; }
+
+  /* ---- UI-Buttons im Lampen-Look ---- */
+  .ui-fixed-btn.ui-lamp{
+    min-width:160px;
+    height:56px;
+    padding:0 16px;
+    border:none;
+    border-radius:32px;
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(180deg,#2f2f2f,#161616);
+    color:#fff;
+    font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+    box-shadow: inset 0 4px 10px rgba(0,0,0,.7), inset 0 -4px 8px rgba(0,0,0,.5);
+    cursor:pointer;
+  }
+  .ui-fixed-btn.ui-lamp::after{
+    content:""; position:absolute; inset:0; border-radius:inherit;
+    background: radial-gradient(ellipse at 50% -30%, rgba(255,255,255,.25), rgba(255,255,255,0) 45%);
+    opacity:.35; mix-blend-mode:screen; pointer-events:none;
+  }
+  .ui-lamp--blue.active{
+    background: radial-gradient(circle at 50% 20%, #e2efff 0%, #4da6ff 40%, #175ab1 70%, #0a224a 100%);
+    box-shadow: 0 0 18px 6px rgba(80,120,255,.55), 0 0 36px 16px rgba(80,120,255,.22);
+    animation: lampPulse 1.2s ease-out 1;
+  }
+  .ui-lamp--blue.glow::after{
+    background: radial-gradient(ellipse at 50% 50%, rgba(140,180,255,.85), rgba(100,140,255,.35) 40%, rgba(100,140,255,0) 70%);
+  }
+  .ui-lamp--gold{ color:#222; text-shadow:none; }
+  .ui-lamp--gold.active{
+    background:#FFD400;
+    box-shadow: 0 0 18px 6px rgba(255,212,0,.65), 0 0 36px 16px rgba(255,212,0,.28);
+    animation: lampPulse 1.2s ease-out 1;
+  }
+  .ui-lamp--gold.glow::after{
+    background: radial-gradient(ellipse at 50% 50%, rgba(255,212,0,.90), rgba(255,212,0,.45) 42%, rgba(255,212,0,0) 70%);
+  }
+  .ui-fixed-btn.ui-lamp{ width:var(--ui-btn-w); height:var(--ui-btn-h); }
+  .ui-fixed-btn.ui-lamp{ color:#8a8aa0; text-shadow:0 1px 0 rgba(0,0,0,.6); }
+
+  /* ===== Vollbild-Overlay (Lock) ===== */
+  .fs-overlay{
+    position:fixed; inset:0; z-index:2147483603;
+    display:none; place-items:center;
+    background:rgba(0,0,0,.9); color:#fff; text-align:center; padding:20px;
+  }
+  .fs-overlay .panel{ max-width:min(700px,92vw); }
+  .fs-overlay h3{ margin:.2em 0 .6em; font-size:clamp(20px,3vw,28px); }
+  .fs-overlay p{ margin:.25em 0 .75em; opacity:.9; }
+  .fs-overlay .actions{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:.5rem; }
+  .fs-overlay .btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:220px; min-height:56px; padding:14px 18px; border-radius:14px; border:2px solid #fff;
+    background:#111; color:#fff; font-weight:900; letter-spacing:.03em; cursor:pointer; text-decoration:none;
+  }
+  /* Visuelles Lock im Canvas, wenn nicht fullscreen */
+  .locked .ui-fixed-btn{ filter:grayscale(1) opacity(.5); pointer-events:none; }
+  .locked .lever{ cursor:not-allowed; }
+</style>
+</head>
+<body>
+<div class="startscreen" id="startScreen">
+  <div class="start-panel">
+    <p class="intro">
+      <em>„In Saxonien sprudeln unzählige geheime Güllebier-Rezepte – und kein Mensch kann sie sich alle merken. Darum übernimmt der legendäre Automatron: Eine dampfbetriebene Wundermaschine voller guter Vorsätze (und gelegentlicher Fehlzündungen). Sie spuckt Ernteaufträge aus, streng nach Rezept – und wehe, die Rüben stehen nicht parat!“</em>
+    </p>
+
+    <h2>Kurzanleitung</h2>
+    <ol>
+      <li><b>Hebel ziehen:</b> Ziehe den roten Knauf kräftig nach unten (fast bis zum Ende) und lass los – die Walzen starten.</li>
+      <li><b>Kombination abwarten:</b> Die unterschiedlichen Rüben (Farben) ergeben das geheime Güllebier-Rezept und somit euren Ernteauftrag.</li>
+      <li><b>Seltenheit & Lohn:</b> Aufträge reichen von einfach bis legendär und werden unterschiedlich vergütet.</li>
+      <li><b>Schnell sein:</b> Wer die Rüben-Kombination als erstes auslegen kann, kassiert die Thaler. Für eine neue Runde zieht den Hebel erneut.</li>
+    </ol>
+
+    <div class="start-actions">
+      <button id="startBtn" type="button">Drücken zum Starten</button>
+    </div>
+  </div>
+</div>
+
+<!-- Vollbild erforderlich Overlay -->
+<div class="fs-overlay" id="fsOverlay" aria-live="polite">
+  <div class="panel">
+    <h3>Vollbild erforderlich</h3>
+    <p>Um den Automaten zu bedienen, bitte in den Vollbildmodus wechseln.</p>
+    <div class="actions">
+      <button id="fsBtn" class="btn" type="button">Vollbild aktivieren</button>
+      <a id="fsExit" class="btn" href="https://schlachtenbummler-verlag.jimdosite.com/neu/">Beenden</a>
+    </div>
+    <p style="opacity:.6;margin-top:.6em">Tipp: „Esc“ beendet den Vollbildmodus.</p>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="canvas" id="canvas">
+    <svg width="0" height="0" aria-hidden="true">
+      <defs>
+        <clipPath id="winClip" clipPathUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="0" height="0" fill="none" />
+          <rect x="300" y="340" width="270" height="270" />
+          <rect x="640" y="340" width="270" height="270" />
+          <rect x="980" y="340" width="270" height="270" />
+          <rect x="1320" y="340" width="270" height="270" />
+          <rect x="280" y="740" width="1360" height="200" />
+        </clipPath>
+      </defs>
+    </svg>
+
+    <div class="reels" id="reels">
+      <div class="reel" id="reel-0"><div class="sweep"></div><div class="streak" hidden></div><div class="symbol"><img src="assets/img/rot.png" alt=""></div></div>
+      <div class="reel" id="reel-1"><div class="sweep"></div><div class="streak" hidden></div><div class="symbol"><img src="assets/img/blau.png" alt=""></div></div>
+      <div class="reel" id="reel-2"><div class="sweep"></div><div class="streak" hidden></div><div class="symbol"><img src="assets/img/gruen.png" alt=""></div></div>
+      <div class="reel" id="reel-3"><div class="sweep"></div><div class="streak" hidden></div><div class="symbol"><img src="assets/img/gelb.png" alt=""></div></div>
+    </div>
+
+    <div class="result" id="gbaResult">
+      <div class="result-inner">
+        <div class="name" id="resName">Ziehe den Hebel für einen Ernteauftrag!</div>
+        <div class="desc" id="resDesc"></div>
+        <div class="points" id="resPts"></div>
+      </div>
+    </div>
+
+    <div class="global-sweep apply-clip" aria-hidden="true"><div class="global-sweep__stripe"></div></div>
+
+    <div class="lever-area">
+      <div id="lever" class="lever" role="button" aria-label="Hebel ziehen" tabindex="0">
+        <div class="lever__back"></div>
+        <div class="lever__slot"></div>
+        <div class="lever__arm"></div>
+        <div class="lever__knob"></div>
+        <div class="lever__ring"></div>
+      </div>
+    </div>
+
+    <div class="lamps-area">
+      <div id="lampGold"  class="lamp lamp--gold"><span class="lamp__label">Legendär</span><div class="lamp__shine"></div></div>
+      <div id="lampBlue"  class="lamp lamp--blue"><span class="lamp__label">Mittel</span><div class="lamp__shine"></div></div>
+      <div id="lampGreen" class="lamp lamp--green"><span class="lamp__label">Normal</span><div class="lamp__shine"></div></div>
+      <div id="lampRed"   class="lamp lamp--red"><span class="lamp__label">Einfach</span><div class="lamp__shine"></div></div>
+    </div>
+
+    <!-- Buttons IM Canvas, damit sie mitskalieren & -schütteln -->
+    <button id="soundToggle" class="ui-fixed-btn ui-lamp ui-lamp--blue" type="button">🔊 SOUND</button>
+    <a id="exitBtn" class="ui-fixed-btn ui-lamp ui-lamp--gold" href="https://schlachtenbummler-verlag.jimdosite.com/neu/">BEENDEN</a>
+
+    <img class="plate__img" src="assets/img/overlay.png" alt="Frontplatte">
+  </div>
+</div>
+
+<div id="rotateOverlay">Bitte Querformat drehen<br><small>(Taste D: Debug-Outlines)</small></div>
+
+<button id="dbgToggle" class="ui-fixed-btn" type="button">🛠️ Debug</button>
+
+<div id="dbgPanel" role="dialog" aria-label="Layout Debug">
+  <!-- (Debug-Panel bleibt im DOM, ist aber via CSS ausgeblendet) -->
+</div>
+
+<script>
+(function(){
+  const $  = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+
+  /* ===== Startscreen + Fullscreen ===== */
+  const startScreen = $('#startScreen');
+  const fsOverlay  = $('#fsOverlay');
+  const fsBtn      = $('#fsBtn');
+
+  function isFullscreen(){ return !!document.fullscreenElement; }
+  function lockUI(on){
+    document.body.classList.toggle('locked', on);
+    fsOverlay.style.display = on ? 'grid' : 'none';
+  }
+  async function enterFullscreen(){
+    const el = document.documentElement;
+    try{
+      if(!isFullscreen() && el.requestFullscreen){ await el.requestFullscreen(); }
+    }catch{}
+  }
+
+  $('#startBtn').addEventListener('click', async ()=>{
+    await enterFullscreen();
+    if(isFullscreen()){
+      startScreen.style.display='none';
+      lockUI(false);
+    }else{
+      // Falls FS geblockt (z. B. iOS), Startscreen bleibt, FS-Overlay auf
+      lockUI(true);
+    }
+  });
+
+  fsBtn.addEventListener('click', async ()=>{
+    await enterFullscreen();
+    lockUI(!isFullscreen());
+  });
+
+  document.addEventListener('fullscreenchange', ()=>{
+    // Bei ESC o.ä. wieder sperren
+    lockUI(!isFullscreen());
+    // Sicherheit: laufende Spins stoppen
+    if(!isFullscreen()) {
+      safeStop(audio.dreh);
+      reelsWrap.classList.remove('spinning');
+      clearTimers();
+      spinning=false;
+      setResult('Vollbild erforderlich','Bitte Vollbild aktivieren.','');
+      allLampsOff();
+    }
+  });
+
+  /* ===== Design-Space skalieren (ohne Transform-Überschreiben) ===== */
+  const canvas = $('#canvas');
+  function fit(){
+    const W = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--design-w')) || 1920;
+    const H = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--design-h')) || 1080;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const scale = Math.min(vw / W, vh / H);
+    const tx = (vw - W*scale)/2;
+    const ty = (vh - H*scale)/2;
+    canvas.style.setProperty('--fit-scale', String(scale));
+    canvas.style.setProperty('--fit-x', tx+'px');
+    canvas.style.setProperty('--fit-y', ty+'px');
+  }
+  addEventListener('resize', fit);
+  addEventListener('orientationchange', fit);
+  document.addEventListener('DOMContentLoaded', fit);
+
+  function checkOrientation(){ $('#rotateOverlay').style.display = (innerHeight>innerWidth)?'flex':'none'; }
+  addEventListener('resize',checkOrientation);
+  addEventListener('orientationchange',checkOrientation);
+  document.addEventListener('DOMContentLoaded',checkOrientation);
+
+  addEventListener('keydown', (e)=>{ if(e.key.toLowerCase()==='d'){ document.body.classList.toggle('debug'); } });
+
+  /* Assets */
+  const IMG = { rot:'assets/img/rot.png', blau:'assets/img/blau.png', gruen:'assets/img/gruen.png', gelb:'assets/img/gelb.png', stoer:'assets/img/stoer.png' };
+  const COLORS_ALL = Object.keys(IMG);
+  const COLORS_NO_STOER = COLORS_ALL.filter(c=>c!=='stoer');
+
+  /* Sounds */
+  const audio = {
+    lever:   new Audio('assets/snd/lever.mp3'),
+    dreh:    new Audio('assets/snd/dreh.mp3'),
+    anhalten:new Audio('assets/snd/anhalten.mp3'),
+    ergebnis:new Audio('assets/snd/ergebnis.mp3'),
+    fanfare: new Audio('assets/snd/fanfare.mp3'),
+    stoer:   new Audio('assets/snd/stoer.mp3'),
+    get enabled(){ return getVar('--sound-enabled')==='1'; }
+  };
+  audio.dreh.loop = true;
+  function safePlay(a){ if(!audio.enabled) return; try{ a.currentTime=0; a.play(); }catch{} }
+  function safeStop(a){ try{ a.pause(); a.currentTime=0; }catch{} }
+
+  /* UI Buttons */
+  const soundBtn = $('#soundToggle');
+  function controlsLocked(){ return !isFullscreen(); }
+
+  function syncSoundBtn(){
+    const on = getVar('--sound-enabled')==='1';
+    soundBtn.textContent = on ? '🔊 SOUND' : '🔇 SOUND';
+    // leuchtet NUR bei "off"
+    soundBtn.classList.toggle('active', !on);
+    soundBtn.classList.toggle('glow', !on);
+  }
+  soundBtn.addEventListener('click', ()=>{
+    if(controlsLocked()) return;
+    const on = getVar('--sound-enabled')==='1';
+    setVar('--sound-enabled', on ? '0' : '1');
+    if(on) safeStop(audio.dreh);
+    syncSoundBtn();
+  });
+  syncSoundBtn();
+
+  const exitBtn = $('#exitBtn');
+  exitBtn.addEventListener('mousedown', ()=>{
+    if(controlsLocked()) return;
+    exitBtn.classList.add('active','glow');
+    setTimeout(()=> exitBtn.classList.remove('active','glow'), 800);
+  });
+
+  /* Reels & Lamps */
+  const reelsWrap = $('#reels');
+  const reels = $$('#reels .reel');
+  const nameEl = $('#resName'), descEl = $('#resDesc'), ptsEl = $('#resPts');
+  function setSymbol(reelEl, color){ const imgEl = reelEl.querySelector('img'); if(imgEl){ imgEl.src = IMG[color]; imgEl.alt = color; } }
+  const rndFrom = arr => arr[(Math.random()*arr.length)|0];
+  const rndAll = () => rndFrom(COLORS_ALL);
+  const rndNoStoer = () => rndFrom(COLORS_NO_STOER);
+  reels.forEach(r=> setSymbol(r, rndNoStoer()));
+
+  const lamps = { gold:$('#lampGold'), blue:$('#lampBlue'), green:$('#lampGreen'), red:$('#lampRed') };
+
+  function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function setVar(n, v){
+    const root=document.documentElement;
+    if(n==='--shine-angle' || n==='--scan-angle') root.style.setProperty(n, parseFloat(v)+'deg');
+    else if(/--(shine-speed|lamp-afterglow)$/.test(n)) root.style.setProperty(n, parseFloat(v)+'s');
+    else if(n.startsWith('--ui-btn-') || n==='--ui-opacity') root.style.setProperty(n, String(v));
+    else root.style.setProperty(n, v);
+  }
+
+  /* Lampen */
+  const lampTimers = new WeakMap();
+  function clearLampTimers(){ Object.values(lamps).forEach(n=>{ const t = lampTimers.get(n); if(t){ clearTimeout(t); lampTimers.delete(n); } n.classList.remove('active','glow'); }); }
+  function flashLamp(el){
+    clearLampTimers();
+    el.classList.add('active','glow');
+    const sec = parseFloat(getVar('--lamp-afterglow')) || 4.2;
+    const t = setTimeout(()=>{ el.classList.remove('active','glow'); lampTimers.delete(el); }, sec*1000);
+    lampTimers.set(el, t);
+  }
+  function setLampsByScore(score){
+    if(score >= 13)      flashLamp(lamps.gold);
+    else if(score >= 10) flashLamp(lamps.blue);
+    else if(score >= 6)  flashLamp(lamps.green);
+    else                 flashLamp(lamps.red);
+  }
+  function allLampsOff(){ Object.values(lamps).forEach(l=> l.classList.remove('active','glow')); }
+  function chaosLamps(ms = 1200){
+    clearLampTimers();
+    const els = Object.values(lamps);
+    const int = setInterval(()=>{
+      els.forEach(l => l.classList.remove('active','glow'));
+      const count = 1 + (Math.random()*3|0);
+      for(let i=0;i<count;i++){ const el = els[Math.random()*els.length|0]; el.classList.add('active'); }
+    }, 120);
+    setTimeout(()=>{ clearInterval(int); allLampsOff(); }, ms + 80);
+  }
+
+  /* Rezepte */
+  const RECIPES = {
+    'rot,rot,rot,rot':{name:'Dösselheimer Güllebier',pts:15,desc:'Die braune Seele Saxoniens.'},
+    'blau,blau,blau,blau':{name:'Leberknebel - Export',pts:15,desc:'Seitenstechen auch ohne Meuchelmörder.'},
+    'gruen,gruen,gruen,gruen':{name:'Braune Soße - Spezial',pts:14,desc:'Zähflüssig, herzhaft, löst Sorgen und Rost.'},
+    'gelb,gelb,gelb,gelb':{name:'Flotter Otto - Extra Hell',pts:14,desc:'Fließt es erst heraus, bleibst du lieber gleich zuhaus!'},
+    'rot,rot,rot,blau':{name:'Klemritzer Nierenquetscher',pts:13,desc:'Massiert die Organe von innen nach außen.'},
+    'rot,rot,rot,gruen':{name:'Rülpsheimer Starkbier',pts:13,desc:'Schenkt Bass im Bauch.'},
+    'rot,rot,rot,gelb':{name:'Lord Villains Glanzparade',pts:13,desc:'Edel und unbestechlich herb.'},
+    'blau,blau,blau,rot':{name:'Donnerburger Steißtritt',pts:13,desc:'Treffsicher im Geschmack.'},
+    'blau,blau,blau,gruen':{name:'Hassnitzer Kellerbräu',pts:13,desc:'Aus dem ganz dunklen Fass.'},
+    'blau,blau,blau,gelb':{name:'Stinkhornsuppe - Spezial',pts:13,desc:'Duftet nach Abenteuer, Freiheit und alten Socken.'},
+    'gruen,gruen,gruen,rot':{name:'Plärrener Humpentrunk',pts:13,desc:'Groß im Glas, laut im Kopf.'},
+    'gruen,gruen,gruen,blau':{name:'Hassburger Urstoff Brühe',pts:13,desc:'So bekömmlich wie eine kleine Pilzvergiftung.'},
+    'gruen,gruen,gruen,gelb':{name:'Dreschmarer Magenhieb',pts:12,desc:'Direkt, ehrlich, unvergesslich.'},
+    'gelb,gelb,gelb,rot':{name:'Knurrwitzer Abtritt',pts:12,desc:'So männlich wie konservative Ein-Artikler.'},
+    'gelb,gelb,gelb,blau':{name:'Ynnors Schnarchtrunk',pts:12,desc:'Wirkt sofort.'},
+    'gelb,gelb,gelb,gruen':{name:'Schwitzwasser Abblende',pts:12,desc:'Leicht bekömmliches Dünnbier.'},
+    'rot,rot,blau,blau':{name:'Beißburger Rübenhamster',pts:11,desc:'Zwei Paare, ein Ziel.'},
+    'rot,rot,gruen,gruen':{name:'Ningelner Nostalgiker - Urtyp',pts:11,desc:'Schmeckt so gut wie früher, nur besser.'},
+    'rot,rot,gelb,gelb':{name:'Stockheimer Knollentrunk',pts:10,desc:'Dick im Glas, jetzt mit noch mehr Fruchtfleisch.'},
+    'blau,blau,gruen,gruen':{name:'Plärrener Feldschorle - Spezial',pts:10,desc:'Damit sie auch morgen noch lauthals schreien können.'},
+    'blau,blau,gelb,gelb':{name:'Grollstädter Rübensprudel - Deluxe',pts:9,desc:'Gebraut mit Liebe.'},
+    'gruen,gruen,gelb,gelb':{name:'Grimmiger Nackenschlag - Extra Herb',pts:9,desc:'Haut rein!'},
+    'rot,rot,blau,gruen':{name:'Kellerleichen - Party - Mix',pts:8,desc:'Für Nächte an die man sich lieber nicht erinnert.'},
+    'rot,rot,blau,gelb':{name:'Broilinger Doppelacker Sud',pts:7,desc:'Das beste aus zwei Welten.'},
+    'rot,rot,gruen,gelb':{name:'Feierabend Erntetrunk',pts:7,desc:'Erfrischend wie eine 16 Stundenschicht bei Schnell & Billig.'},
+    'blau,blau,rot,gruen':{name:'Zwicker Feldweg - Knöchelknacks',pts:6,desc:'Holprig und bitter.'},
+    'blau,blau,rot,gelb':{name:'Ackerbowle',pts:6,desc:'Erdig-Herb'},
+    'blau,blau,gruen,gelb':{name:'Lumpa Umpas goldene Brause - Edel',pts:6,desc:'Kurz aber kräftig.'},
+    'gruen,gruen,rot,blau':{name:'Freudloser Hopfenrübling - Hell',pts:5,desc:'Der Spaß aus dem Glas.'},
+    'gruen,gruen,rot,gelb':{name:'Ackerschorle - Export',pts:5,desc:'Das Erfrischungsgetränk für jede Arbeit.'},
+    'gruen,gruen,blau,gelb':{name:'Winkelstädter Gärtnerpils',pts:5,desc:'Gereift im Biercubus.'},
+    'gelb,gelb,rot,blau':{name:'Lästerhainer Jodelsprudel',pts:4,desc:'Nach zwei Schlucken singst du.'},
+    'gelb,gelb,rot,gruen':{name:'Donnerburger Rübenschädel - Spezial',pts:4,desc:'Gebraut mit Blitz und Donner.'},
+    'gelb,gelb,blau,gruen':{name:'Karnickelfangschlag',pts:4,desc:'Erst pelzig auf der Zunge, dann schnell im Abgang.'},
+    'rot,blau,gruen,gelb':{name:'Querbeet - Klassik',pts:2,desc:'Von allem ein bisschen.'}
+  };
+  const keyOf = arr => arr.slice().sort().join(',');
+  const RECIPES_INDEX = {}; Object.keys(RECIPES).forEach(k => { RECIPES_INDEX[keyOf(k.split(','))] = RECIPES[k]; });
+  function getRecipeFromColors(colorsArr){ return RECIPES_INDEX[keyOf(colorsArr)] }
+  function setResult(name='', desc='', pts=''){ nameEl.textContent = name; descEl.textContent = desc; ptsEl.textContent  = pts; }
+
+  /* ===== Hebel + Endanschlag an Schlitz (mobil-fix) + Vibration + Messwerte ===== */
+  const lever = $('#lever');
+  const knob  = lever.querySelector('.lever__knob');
+  const ring  = lever.querySelector('.lever__ring');
+  const slot  = lever.querySelector('.lever__slot');
+  let dragging=false, startY=0, startVal=0, maxY=200, lastY=0, lastT=0, maxSpeedDown=0;
+
+  function measure(){
+    // Unskaliert via offset*, damit Hebel-Scale nicht stört
+    const leverH = lever.offsetHeight || 300;
+    const knobH  = knob.offsetHeight  || 56;
+    const slotTop = slot.offsetTop;
+    const slotBottom = slotTop + slot.offsetHeight;
+
+    const bc = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lever-bottom-clearance')) || 6;
+    const ringOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lever-ring-offset')) || 52;
+    const ringH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lever-ring-h')) || 8;
+
+    const maxByKnob = (leverH - knobH - bc);
+    const maxByRing = (slotBottom - (ringOffset + ringH) - bc);
+
+    maxY = Math.max(0, Math.min(maxByKnob, maxByRing));
+  }
+  measure();
+  addEventListener('resize', measure);
+
+  // Vibration
+  let vibTimer=null, holdStart=0;
+  const canVibrate = () => 'vibrate' in navigator;
+  function startVibrationHold(){
+    if(!canVibrate() || controlsLocked()) return;
+    holdStart = Date.now();
+    try{ navigator.vibrate(10); }catch{}
+    clearInterval(vibTimer);
+    vibTimer = setInterval(()=>{ try{ navigator.vibrate(8); }catch{} }, 90);
+  }
+  function stopVibrationHold(){
+    if(!canVibrate()) return;
+    clearInterval(vibTimer); vibTimer=null;
+    try{ navigator.vibrate(0); }catch{}
+  }
+  function burstVibration(){
+    if(!canVibrate() || controlsLocked()) return;
+    const held = Date.now()-holdStart;
+    try{ (held>200) ? navigator.vibrate([0,18,30,18]) : navigator.vibrate(15); }catch{}
+  }
+
+  function setKnob(y, withTransition){
+    const clamped = Math.max(0, Math.min(maxY, y));
+    const ringOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lever-ring-offset')) || 52;
+    if(!withTransition){ knob.style.transition='none'; ring.style.transition='none'; }
+    knob.style.setProperty('--y', clamped+'px');
+    ring.style.transform = `translate(-50%, ${clamped + ringOffset}px)`;
+    if(!withTransition){ void knob.offsetHeight; knob.style.transition=''; ring.style.transition=''; }
+    return clamped;
+  }
+
+  /* ==== Shake-Intensität Helpers ==== */
+  const clamp = (v, min=0, max=1) => Math.max(min, Math.min(max, v));
+  const lerp  = (a,b,t) => a + (b-a)*t;
+  /** Intensität aus Haltezeit, maximaler Abwärts-Geschwindigkeit und Tiefe.
+      Sehr langsamer Zug => nahe 0; schneller/tiefer => höher. */
+  function computeShakeIntensity({holdMs, maxSpeedDown, depth}){
+    const holdNorm  = clamp((holdMs - 180) / 1200);        // erst ab ~0.2s spürbar
+    const speedNorm = clamp((maxSpeedDown - 0.10) / 1.40); // <0.1 px/ms ≈ 0
+    const depthNorm = clamp((depth - 0.80) / 0.20);        // erst ab 80% Zug relevant
+    // Speed dominiert, dann Hold, wenig Tiefe:
+    return clamp(0.78*speedNorm + 0.17*holdNorm + 0.05*depthNorm, 0, 1);
+  }
+
+  function onDown(e){
+    if(controlsLocked()) { e.preventDefault(); return; }
+    measure(); // bei Start neu messen (falls gescaled)
+    dragging=true;
+    startY=('touches' in e ? e.touches[0].clientY : e.clientY);
+    lastY = startY;
+    lastT = performance.now();
+    maxSpeedDown = 0;
+    const cur=parseFloat(getComputedStyle(knob).getPropertyValue('--y'))||0;
+    startVal=cur; setKnob(cur,false);
+    safePlay(audio.lever);
+    startVibrationHold();
+    e.preventDefault();
+  }
+  function onMove(e){
+    if(!dragging) return;
+    const y = ('touches' in e ? e.touches[0].clientY : e.clientY);
+    const now = performance.now();
+    const dY  = y - lastY;
+    const dt  = now - lastT || 1;
+    if(dY > 0){
+      const v = dY / dt; // px/ms
+      if(v > maxSpeedDown) maxSpeedDown = v;
+    }
+    lastY = y;
+    lastT = now;
+
+    const dyFromStart = y - startY;
+    setKnob(startVal + dyFromStart, false);
+    e.preventDefault();
+  }
+  function onUp(){
+    if(!dragging) return; dragging=false;
+    stopVibrationHold(); burstVibration();
+    const cur = parseFloat(getComputedStyle(knob).getPropertyValue('--y'))||0;
+    const ratio = cur/(maxY||1);
+    const holdMs = Date.now() - holdStart;
+    const intensity = computeShakeIntensity({holdMs, maxSpeedDown, depth: ratio});
+
+    setKnob(0,true);
+    if(ratio>=0.8) spin(intensity);
+  }
+
+  lever.addEventListener('mousedown',onDown);
+  addEventListener('mousemove',onMove);
+  addEventListener('mouseup',onUp);
+  lever.addEventListener('touchstart',onDown,{passive:false});
+  addEventListener('touchmove',onMove,{passive:false});
+  addEventListener('touchend',onUp);
+  lever.addEventListener('keydown',e=>{
+    if(e.key===' '||e.key==='Enter'){
+      if(controlsLocked()) { e.preventDefault(); return; }
+      e.preventDefault();
+      setKnob(maxY,true);
+      setTimeout(()=>{ setKnob(0,true); spin(0.8); },180);
+    }
+  });
+
+  /* ===== Zufälliger Shake-Trigger ===== */
+  function triggerShake(intensity=1){
+    intensity = clamp(intensity, 0, 1);
+    const sign    = Math.random()<0.5 ? -1 : 1;
+    const magPx   = lerp(0.5, 12, intensity).toFixed(2) + 'px';      // sehr langsam => ~0.5px
+    const rmagDeg = lerp(0.05, 0.50, intensity).toFixed(3) + 'deg';  // sanft bis merklich
+    const durMs   = Math.round(lerp(200, 420, intensity) * (0.9 + Math.random()*0.2)); // ±10%
+    canvas.style.setProperty('--shake-sign', String(sign));
+    canvas.style.setProperty('--shake-mag', magPx);
+    canvas.style.setProperty('--shake-rot-mag', rmagDeg);
+    canvas.classList.add('shake');
+    canvas.style.animationDuration = durMs + 'ms';
+    setTimeout(()=> canvas.classList.remove('shake'), durMs + 40);
+  }
+
+  /* Spin-Logik */
+  let spinning=false; let timers=[]; let intervals=[];
+  function clearTimers(){ intervals.forEach(i=>clearInterval(i)); intervals=[]; timers.forEach(t=>clearTimeout(t)); timers=[]; }
+
+  function spin(intensity=0.75){
+    if(controlsLocked()) return;
+    if(spinning) return; spinning=true;
+    triggerShake(intensity);
+
+    setResult('…suche Rezept…','','');
+    reelsWrap.classList.add('spinning');
+    safePlay(audio.dreh);
+
+    const STOER_CHANCE = 40;
+    const willForceStoerStop = ((Math.random()*STOER_CHANCE)|0)===0;
+
+    reels.forEach((r)=>{
+      r.classList.add('spinning');
+      r.querySelector('.streak').hidden=false;
+      const intId = setInterval(()=> setSymbol(r, rndAll()), 92);
+      intervals.push(intId);
+    });
+
+    const stopBase=[1100,1750,2400,3050];
+    let finalColors = [];
+
+    reels.forEach((r,i)=>{
+      const to=setTimeout(()=>{
+        clearInterval(intervals[i]);
+        const finalColor = willForceStoerStop ? 'stoer' : rndNoStoer();
+        setSymbol(r, finalColor);
+        finalColors[i]=finalColor;
+
+        r.classList.remove('spinning'); r.classList.add('stop-bounce');
+        r.querySelector('.streak').hidden=true;
+        safePlay(audio.anhalten);
+        r.addEventListener('animationend',()=> r.classList.remove('stop-bounce'),{once:true});
+
+        if(i===reels.length-1){
+          reelsWrap.classList.remove('spinning');
+          safeStop(audio.dreh);
+
+          if(finalColors.every(c=>c==='stoer')){
+            chaosLamps(1400);
+            setResult('❌ Der Automatron hat eine Störung!','Ziehe den Hebel zum Neustart.','');
+            safePlay(audio.stoer);
+            try{ if('vibrate' in navigator) navigator.vibrate([0,40,40,40]); }catch{}
+            spinning=false; clearTimers(); return;
+          }
+
+          const recipe = getRecipeFromColors(finalColors);
+          if(!recipe){
+            setResult('Unbekanntes Rezept','(Kombination nicht definiert)','');
+            spinning=false; clearTimers(); return;
+          }
+
+          setLampsByScore(recipe.pts);
+          setResult(recipe.name, recipe.desc, `+${recipe.pts} Thaler`);
+          safePlay(audio.ergebnis);
+          if(recipe.pts>=13) safePlay(audio.fanfare);
+
+          spinning=false; clearTimers();
+        }
+      }, stopBase[i]+Math.floor(Math.random()*260));
+      timers.push(to);
+    });
+  }
+
+  /* === Initial sperren, bis FS an === */
+  document.addEventListener('DOMContentLoaded', ()=>{
+    lockUI(!isFullscreen());
+  });
+})();
+</script>
+</body>
+</html>
